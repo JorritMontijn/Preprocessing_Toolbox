@@ -4,7 +4,7 @@ function DC_updateTextInformation(varargin)
 	global sDC;
 	
 	%check if data has been loaded
-	if isempty(sDC) || isempty(sFig)
+	if isempty(sFig) || (isempty(sDC) && nargin == 0)
 		return;
 	else
 		try
@@ -28,30 +28,36 @@ function DC_updateTextInformation(varargin)
 			if isfield(sDC.ROI(intObject),'intRespType') && isscalar(sDC.ROI(intObject).intRespType),intRespType=sDC.ROI(intObject).intRespType;else intRespType=1;end
 			set(sFig.ptrEditSelect,'string',num2str(intObject));
 			set(sFig.ptrEditSelect,'string',num2str(intSubTypeNr));
-			cellText{1} = ['object: ' num2str(intObject) ' ; subtype nr: ' num2str(intSubTypeNr)];
-			cellText{2} = ['type: ' sDC.metaData.cellType{sDC.ROI(intObject).intType}];
-			cellText{3} = ['presence: ' sDC.metaData.cellPresence{intPresence}];
-			cellText{4} = ['responsiveness: ' sDC.metaData.cellRespType{intRespType}];
-			cellText{5} = ['size: ' num2str(sum(sDC.ROI(intObject).matMask(:))) 'pixels'];
-			cellText{6} = ['x-center: ' num2str(sDC.ROI(intObject).intCenterX)];
-			cellText{7} = ['y-center: ' num2str(sDC.ROI(intObject).intCenterY)];
+			cellText{1} = sprintf('Object: %d; subtype: %d',intObject,intSubTypeNr);
+			cellText{2} = sprintf('Type: %s',sDC.metaData.cellType{sDC.ROI(intObject).intType});
+			cellText{3} = sprintf('Presence: %s',sDC.metaData.cellPresence{intPresence});
+			cellText{4} = sprintf('Responsiveness: %s',sDC.metaData.cellRespType{intRespType});
+			cellText{5} = sprintf('Size: %d pixels',sum(sDC.ROI(intObject).matMask(:)));
+			cellText{6} = sprintf('Center: x=%.2f, y=%.2f',sDC.ROI(intObject).intCenterX,sDC.ROI(intObject).intCenterY);
 		elseif sum(sFig.vecSelectedObjects) > 1
-			cellText{1} = ['number of selected objects: ' num2str(length(sFig.vecSelectedObjects))] ;
-			cellText{2} = [''] ;
-			cellText{3} = ['more than 1 cell selected, no info'] ;
+			cellText{1} = sprintf('Number of selected objects: %d',length(sFig.vecSelectedObjects));
+			cellText{2} = '';
+			cellText{3} = 'More than 1 cell selected, no info';
 		elseif sum(sFig.vecSelectedObjects) < 1
-			cellText{1} = ['no cells selected'] ;
-			cellText{2} = [''] ;
-			cellText{3} = [''] ;
+			cellText{1} = 'No cells selected';
 		end
 		%set selection boxes
 		set(sFig.ptrEditSelect,'string',num2str(intObject));
 		set(sFig.ptrEditSubSelect,'string',num2str(intSubTypeNr));
 	end
-	
-	
+	%{
+	%add time stamp
+	for intLine=1:numel(cellText)
+		if ~isempty(cellText{intLine}) && ~strcmpi(cellText{intLine}(1),'[') 
+			cellText{intLine} = [sprintf('[%s] ',getTime),cellText{intLine}];
+		end
+	end
 	
 	%set figure text
+	cellTextOld = get(sFig.ptrTextInformation, 'string');
+	cellText = cat(1,cellText,{''},cellTextOld);
+	%}
+	if numel(cellText) > 6,cellText(7:end) = [];end
 	set(sFig.ptrTextInformation, 'string', cellText );
 	drawnow;
 end

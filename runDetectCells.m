@@ -2,7 +2,7 @@
 function varargout = runDetectCells(varargin)
 	% runDetectCells Detect cells with GUI
 	%
-	%	Version 2.1 [2014-05-16]
+	%	Version 3.0 [2018-11-30]
 	%	2013-03-14; Created by Jorrit Montijn
 	%	2013-10-21; updated cross-recording alignment; incorporated
 	%	custom-built recursive locally affine registration algorithm to
@@ -18,6 +18,8 @@ function varargout = runDetectCells(varargin)
 	%	2014-02-13; changed 'designation' to two separate properties,
 	%	including responsiveness and presence [by JM] 
 	%	2014-05-16; made several bug fixes and GUI changes [by JM] 
+	%	2018-11-30; built automatic cell detection [by JM] 
+	%	2018-12-05; overhaul of GUI, improved detection [by JM] 
 	
 	%set tags
 	%#ok<*INUSL>
@@ -51,14 +53,18 @@ function ptrEditMagnification_CreateFcn(hObject, eventdata, handles),end %#ok<DE
 function ptrEditZoom_CreateFcn(hObject, eventdata, handles),end %#ok<DEFNU>
 function ptrEditSelect_CreateFcn(hObject, eventdata, handles),end %#ok<DEFNU>
 function ptrListPresence_CreateFcn(hObject, eventdata, handles),end %#ok<DEFNU>
-function ptrListRespType_CreateFcn(hObject, eventdata, handles),end %#ok<DEFNU>
 function ptrListPresence_Callback(hObject, eventdata, handles), end %#ok<DEFNU>
+function ptrListRespType_CreateFcn(hObject, eventdata, handles),end %#ok<DEFNU>
 function ptrListRespType_Callback(hObject, eventdata, handles), end %#ok<DEFNU>
 function ptrEditSubSelect_CreateFcn(hObject, eventdata, handles),end %#ok<DEFNU>
 function ptrListSelectDrawType_CreateFcn(hObject, eventdata, handles),end %#ok<DEFNU>
 function ptrListBoundaryType_CreateFcn(hObject, eventdata, handles),end %#ok<DEFNU>
-function ButtonGroupAnnotations_CreateFcn(hObject, eventdata, handles),set(hObject,'SelectionChangeFcn','runDetectCells(''ChangeAnnotations'')');end %#ok<DEFNU>
 function ptrListBoundaryType_Callback(hObject, eventdata, handles),end %#ok<DEFNU>
+function ButtonGroupAnnotations_CreateFcn(hObject, eventdata, handles),set(hObject,'SelectionChangeFcn','runDetectCells(''ChangeAnnotations'')');end %#ok<DEFNU>
+function ptrListAllowDeletion_CreateFcn(hObject, eventdata, handles), end %#ok<DEFNU>
+function ptrListAllowDeletion_Callback(hObject, eventdata, handles), end %#ok<DEFNU>
+function ptrListRefineType_Callback(hObject, eventdata, handles),end %#ok<DEFNU>
+function ptrListRefineType_CreateFcn(hObject, eventdata, handles),end %#ok<DEFNU>
 
 %% opening function; initializes output
 function runDetectCells_OpeningFcn(hObject, eventdata, handles, varargin)
@@ -416,7 +422,7 @@ function ptrButtonLoadRecording_Callback(hObject, eventdata, handles) %#ok<DEFNU
 	
 	%switch path
 	try
-		oldPath = cd('D:\Data\Processed\imagingdata');
+		oldPath = cd('C:\Data\Processed\imagingdata\');
 	catch
 		oldPath = cd();
 	end
@@ -429,10 +435,17 @@ function ptrButtonLoadRecording_Callback(hObject, eventdata, handles) %#ok<DEFNU
 	
 	%check whether a file has been selected, otherwise, do nothing
 	if ischar(strRecFile)
-		%clear old data
+		%% clear old data
 		sRec = []; %#ok<NASGU>
 		sFig = []; %#ok<NASGU>
 		sDC = []; %#ok<NASGU>
+		
+		%% populate figure
+		sFig = DC_populateFigure(handles);
+		
+		%set msg
+		cellText{1} = sprintf('Loading recording %s from %s...',strRecFile,strRecPath);
+		DC_updateTextInformation(cellText);
 		
 		%load structure
 		sLoad = load([strRecPath strRecFile]);
@@ -453,7 +466,7 @@ function ptrButtonLoadRecording_Callback(hObject, eventdata, handles) %#ok<DEFNU
 		if isempty(sDir),strPath = strRecPath;end
 		strImage = [strPath filesep 'average' filesep 'OverlayProc.tif'];
 		
-		%load image
+		%% load image
 		imProc = im2double(imread(strImage));
 		if intCaCh ~= 2
 			imNew = imProc;
@@ -463,36 +476,57 @@ function ptrButtonLoadRecording_Callback(hObject, eventdata, handles) %#ok<DEFNU
 			imProc = imNew;
 			clear imNew;
 		end
+		%add image
+		sFig.imProc = imProc;
 		
-		%populate cell detection structure
+		%% populate data structure
 		if isfield(sRec,'sDC')
 			sDC = sRec.sDC;
 		else
-			sDC = DC_populateStructure();
+			sDC = struct;
 		end
 		sDC.strRecFile = strRecFile;
 		sDC.strRecPath = strRecPath;
 		sDC.metaData.strProcessedPath = strRecPath;
+		sDC = DC_populateStructure(sDC);
 		sRec.sMD.strMasterDir(1) = strRecPath(1);
 		
-		%populate figure structure
-		sFig = DC_populateFigure(handles);
-		sFig.imProc = imProc;
-		
-		%put pixel responsiveness types into list
-		if isfield(sRec,'sPixResp') && isfield(sRec.sPixResp,'matPixelSelectivity') && isfield(sRec.sPixResp,'matPixelMaxResponsiveness')
-			%for backward compatibility
-			sDC.metaData.cellPixRespType{1} = 'None';
-			sDC.metaData.cellPixRespType{2} = 'Selectivity';
-			sDC.metaData.cellPixRespType{3} = 'Activation';
+		%% put pixel responsiveness types into list
+		if isfield(sRec,'sPixResp')
+			intExtraImCounter = 0;
+			if true
+				%empty image
+				intExtraImCounter = intExtraImCounter + 1;
+				sDC.metaData.cellPixRespType{intExtraImCounter} = 'None';
+				sRec.sPixResp.cellExtraIm{intExtraImCounter} = zeros(size(sRec.sPixResp.matPixelSelectivity));
+			end
+			if isfield(sRec.sPixResp,'matPixelSelectivity')
+				%Selectivity image
+				intExtraImCounter = intExtraImCounter + 1;
+				sDC.metaData.cellPixRespType{intExtraImCounter} = 'Selectivity';
+				sRec.sPixResp.cellExtraIm{intExtraImCounter} = sRec.sPixResp.matPixelSelectivity;
+			end
+			if isfield(sRec.sPixResp,'matPixelMaxResponsiveness')
+				%Activation image
+				intExtraImCounter = intExtraImCounter + 1;
+				sDC.metaData.cellPixRespType{intExtraImCounter} = 'Activation';
+				sRec.sPixResp.cellExtraIm{intExtraImCounter} = sRec.sPixResp.matPixelMaxResponsiveness;
+			end
+			if isfield(sRec.sPixResp,'matBelongsToSameAsNeighbor')
+				%Neighbour corr image
+				intExtraImCounter = intExtraImCounter + 1;
+				sDC.metaData.cellPixRespType{intExtraImCounter} = 'Neighbour Corr';
+				sRec.sPixResp.cellExtraIm{intExtraImCounter} = sRec.sPixResp.matBelongsToSameAsNeighbor;
+			end
+			if isfield(sRec.sPixResp,'matFloodBorders')
+				%add image to list
+				intExtraImCounter = intExtraImCounter + 1;
+				sDC.metaData.cellPixRespType{intExtraImCounter} = 'Flood Borders';
+				sRec.sPixResp.cellExtraIm{intExtraImCounter} = sRec.sPixResp.matFloodBorders;
+			end
 			
 			%set pixel resp types to those defined in DC_populateStructure
 			set(sFig.ptrListSelectPixelResponsiveness,'String',sDC.metaData.cellPixRespType)
-			
-			%add maps to list
-			sRec.sPixResp.cellExtraIm{1} = zeros(size(sRec.sPixResp.matPixelSelectivity),class(sRec.sPixResp.matPixelSelectivity));
-			sRec.sPixResp.cellExtraIm{2} = sRec.sPixResp.matPixelSelectivity;
-			sRec.sPixResp.cellExtraIm{3} = sRec.sPixResp.matPixelMaxResponsiveness;
 			
 			% put in list
 			intType = get(sFig.ptrListSelectPixelResponsiveness, 'Value');
@@ -504,6 +538,7 @@ function ptrButtonLoadRecording_Callback(hObject, eventdata, handles) %#ok<DEFNU
 			sFig.imProc(:,:,3) = matNorm;
 		end
 		
+		%% populate figure with DC structure data
 		%put images into list
 		[cellIm,cellImName] = DC_createImageList(sFig.imProc);
 		sFig.cellIm = cellIm;
@@ -511,46 +546,145 @@ function ptrButtonLoadRecording_Callback(hObject, eventdata, handles) %#ok<DEFNU
 		sFig.intImSelected = get(sFig.ptrListSelectImage,'Value');
 		
 		%populate presence list
-		%for backward compatibility
-		if ~isfield(sDC.metaData,'cellPresence')
-			sDC.metaData.cellPresence{1} = 'present';
-			sDC.metaData.cellPresence{2} = 'absent';
-			sDC.metaData.cellPresence{3} = 'filled';
-		end
 		set(sFig.ptrListPresence,'String',sDC.metaData.cellPresence);%set designation types to those defined in DC_populateStructure
 		
 		%populate responsiveness list
-		%for backward compatibility
-		if ~isfield(sDC.metaData,'cellRespType')
-			sDC.metaData.cellRespType{1} = 'tun+resp';
-			sDC.metaData.cellRespType{2} = 'tuned';
-			sDC.metaData.cellRespType{3} = 'responsive';
-			sDC.metaData.cellRespType{4} = 'silent';
-		end
 		set(sFig.ptrListRespType,'String',sDC.metaData.cellRespType);%set designation types to those defined in DC_populateStructure
 		set(sFig.ptrListRespType,'Value',4); %set selected type to be silent by default
 		
 		%populate draw type list
-		%for backward compatibility
-		sDC.metaData.cellDrawType{1} = 'Border';
-		sDC.metaData.cellDrawType{2} = 'Centroid';
 		set(sFig.ptrListSelectDrawType,'String',sDC.metaData.cellDrawType);%set designation types to those defined in DC_populateStructure
 		set(sFig.ptrListSelectDrawType,'Value',1); %set selected type to be silent by default
 		
 		%set cell types to those defined in DC_populateStructure
-		set(handles.ptrListCellType,'String',sDC.metaData.cellType)
+		set(sFig.ptrListCellType,'String',sDC.metaData.cellType)
 		
 		%set to hide annotations
 		set(sFig.ptrButtonRadioAnnotationsHide,'Value',1);
 		
 		%populate boundary type list
-		%for backward compatibility
-		sDC.metaData.cellBoundaryType{1} = 'OGB';
-		sDC.metaData.cellBoundaryType{2} = 'GCaMP';
-		set(sFig.ptrListBoundaryType,'String',sDC.metaData.cellBoundaryType);%set designation types to those defined in DC_populateStructure
-		set(sFig.ptrListBoundaryType,'Value',1); %set selected type to be silent by default
+		set(sFig.ptrListBoundaryType,'String',sDC.metaData.cellBoundaryType);%set designation types to those defined in sDC
+		set(sFig.ptrListBoundaryType,'Value',numel(sDC.metaData.cellBoundaryType)); %set selected type to newest by default
 		
-		%set msg
+		%populate refine type list
+		set(sFig.ptrListRefineType,'String',sDC.metaData.cellRefineType);%set designation types to those defined in sDC
+		set(sFig.ptrListRefineType,'Value',1); %set selected type to 1 by default
+		
+		%populate ROI deletion list
+		set(sFig.ptrListAllowDeletion,'String',sDC.metaData.cellAllowDeletion);%set designation types to those defined in sDC
+		set(sFig.ptrListAllowDeletion,'Value',numel(sDC.metaData.cellAllowDeletion)); %set selected type to newest by default
+		
+		
+		%% check for automatic cell detection data
+		if isfield(sRec,'sPixResp') && isempty(sDC.ROI) && isfield(sRec.sPixResp,'matAutoCellDetectMasks') && ~isempty(sRec.sPixResp.matAutoCellDetectMasks)
+			intObjects = size(sRec.sPixResp.matAutoCellDetectMasks,3);
+			
+			%set msg
+			cellText{1} = sprintf('Found %d automatically detected ROIs. Assigning... ',intObjects);
+			DC_updateTextInformation(cellText);
+			
+			%assign objects
+			for intObject=1:intObjects
+				%get mask
+				matMask = sRec.sPixResp.matAutoCellDetectMasks(:,:,intObject);
+				vecCoM = calcCenterOfMass(matMask);
+				
+				% save roi and close window
+				sDC.ROI(intObject).intPresence = 1;
+				sDC.ROI(intObject).intRespType = 1;
+				sDC.ROI(intObject).intType = 1;
+				sDC.ROI(intObject).intCenterX = vecCoM(2);
+				sDC.ROI(intObject).intCenterY = vecCoM(1);
+				
+				%sDC.ROI(intNewObject).matPerimeter = [vecRealX; vecRealY]';
+				sDC.ROI(intObject).matMask = matMask;
+				
+				
+				sFig.sObject(intObject).drawn = false;
+				sFig.sObject(intObject).handles.marker = [];
+				sFig.sObject(intObject).handles.lines = [];
+			end
+		end
+		
+		%% run automatic detection if not run yet
+		if ~isfield(sRec.sPixResp,'matFloodBorders') || isempty(sRec.sPixResp.matFloodBorders)
+			%set msg
+			cellText{1} = sprintf('Building flood borders for automatic cell detection...');
+			DC_updateTextInformation(cellText);
+			
+			%build flood borders
+			dblMergeThreshold = 30;
+			imDetect = sFig.cellIm{1};
+			im1D = imDetect(:,:,2);
+			[matFloodBorders,matMergedCentroids,vecMergedRadii] = DC_ACD_GetFloodBorders(im1D,dblMergeThreshold);
+			sRec.sPixResp.matFloodBorders = matFloodBorders;
+			
+			%set msg
+			cellText{1} = sprintf('Removing double-detected centroids...');
+			DC_updateTextInformation(cellText);
+			
+			%add image to list
+			intExtraImCounter = intExtraImCounter + 1;
+			sDC.metaData.cellPixRespType{intExtraImCounter} = 'Flood Borders';
+			sRec.sPixResp.cellExtraIm{intExtraImCounter} = sRec.sPixResp.matFloodBorders;
+			set(sFig.ptrListSelectPixelResponsiveness,'String',sDC.metaData.cellPixRespType)
+			
+			%% remove double detected centroids
+			%get old centroids
+			intPrevROIs = numel(sDC.ROI);
+			matOldCentroids = nan(intPrevROIs,2);
+			for intROI=1:intPrevROIs
+				matOldCentroids(intROI,:) = [sDC.ROI(intROI).intCenterX sDC.ROI(intROI).intCenterY];
+			end
+			
+			%loop
+			dblDeleteThreshold = 30;
+			intNewCentroids = size(matMergedCentroids,1);
+			indKeep = false(1,intNewCentroids);
+			for intNewCentroid=1:intNewCentroids
+				%get this centroid's location
+				vecLoc=matMergedCentroids(intNewCentroid,:);
+				
+				%get distance to other centroids
+				vecDist = sqrt((vecLoc(1)-matOldCentroids(:,1)).^2 + (vecLoc(2)-matOldCentroids(:,2)).^2);
+				if ~any(vecDist<dblDeleteThreshold)
+					indKeep(intNewCentroid) = true;
+				end
+			end
+			matMergedCentroids(~indKeep,:) = [];
+			vecMergedRadii(~indKeep) = [];
+			
+			%get selected types
+			try
+				intType = get(sFig.ptrListCellType, 'Value');
+				intPresence = get(sFig.ptrListPresence, 'Value');
+				intRespType = get(sFig.ptrListRespType, 'Value');
+			catch
+				intType = 1;
+				intPresence = 1;
+				intRespType = 1;
+			end
+			%add objects
+			for intObject=1:sum(indKeep)
+				% save roi
+				intNewObject = intObject+intPrevROIs;
+				sDC.ROI(intNewObject).intPresence = intPresence;
+				sDC.ROI(intNewObject).intRespType = intRespType;
+				sDC.ROI(intNewObject).intType = intType;
+				sDC.ROI(intNewObject).intCenterX = matMergedCentroids(intObject,1);
+				sDC.ROI(intNewObject).intCenterY = matMergedCentroids(intObject,2);
+				sDC.ROI(intNewObject).dblRadius = vecMergedRadii(intObject);
+				
+				sDC.ROI(intNewObject).matPerimeter = [];
+				sDC.ROI(intNewObject).matMask = [];
+				
+				sFig.sObject(intNewObject).drawn = 0;
+				sFig.sObject(intNewObject).handles.marker = [];
+				sFig.sObject(intNewObject).handles.lines = [];
+			end
+		end
+		
+		%% end message
 		cellText{1} = sprintf('Loaded recording %s from %s',strRecFile,strRecPath);
 		DC_updateTextInformation(cellText);
 		
@@ -1628,9 +1762,227 @@ function ptrButtonSetSubtypeNr_Callback(hObject, eventdata, handles) %#ok<DEFNU>
 	%unlock GUI
 	DC_unlock(handles);
 end
+function ptrButtonShowPixelCorrs_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+	%show pixel correlations around click
+	
+	%load global
+	global sRec;
+	global sFig;
+	
+	%lock GUI
+	DC_lock(handles);
+	
+	%set msg
+	clear cellText;
+	cellText{1} = sprintf('Please click to select target pixel');
+	DC_updateTextInformation(cellText);
+	
+	%wait for click in window
+	[intRealX,intRealY] = DC_WaitForClick(sFig);
+	
+	%get zoom factor
+	[intY,intX] = size(sRec.sPixResp.matBelongsToSameAsNeighbor);
+	intSubY = size(sRec.sPixResp.matPixelCorrMat,1);
+	intSubX = size(sRec.sPixResp.matPixelCorrMat,2);
+	intRealSubY = ceil((intSubY/intY)*intRealY);
+	intRealSubX = ceil((intSubX/intX)*intRealX);
+	
+	%show pixel correlations around click
+	figure;
+	matPixelCorrMat = sRec.sPixResp.matPixelCorrMat;
+	matMean = squeeze(xmean(xmean(matPixelCorrMat,1),2));
+	matPlotCorrs = squeeze(matPixelCorrMat(intRealSubY,intRealSubX,:,:))-matMean;
+	dblMaxVal = max(abs(matPlotCorrs(:)));
+	intCenter = round(size(matMean,1)/2);
+	intSpatWin = intCenter-1;
+	imagesc(-intSpatWin:intSpatWin,-intSpatWin:intSpatWin,matPlotCorrs,dblMaxVal*[-1 1]);
+	axis xy;hold on;
+	scatter(0,0,'rx','Linewidth',5);
+	colorbar;colormap(redblue);
+	title(sprintf('Pixel-wise correlations at x=%d,y=%d',intRealX,intRealY))
+	fixfig;
+	grid off;
+	
+	%set msg
+	clear cellText;
+	cellText{1} = sprintf('Showing pixel correlations around X=%d, Y=%d',intRealX,intRealY);
+	DC_updateTextInformation(cellText);
+	
+	%unlock GUI
+	DC_unlock(handles);
+end
+
+function ptrButtonDetectObjects_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+	%% detect centroids
+	
+	%load globals
+	global sRec;
+	global sFig;
+	global sDC
+	
+	%lock GUI
+	DC_lock(handles);
+	
+	%set msg
+	clear cellText;
+	cellText{1} = sprintf('Detecting new centroids...');
+	DC_updateTextInformation(cellText);
+	
+	%% detect circles
+	%get refine type
+	strRefineType = sDC.metaData.cellRefineType{get(sFig.ptrListRefineType, 'Value')};
+	if contains(strRefineType,'MultiTier+','IgnoreCase',true)
+		intUseAlgo = 1;
+	elseif contains(strRefineType,'Corr','IgnoreCase',true)
+		intUseAlgo = 2;
+	elseif contains(strRefineType,'Lum','IgnoreCase',true)
+		intUseAlgo = 3;
+	end
+	
+	%get image
+	if intUseAlgo == 1
+		imDetect = sRec.sPixResp.matFloodBorders;
+	elseif intUseAlgo == 2
+		imDetect = sRec.sPixResp.matBelongsToSameAsNeighbor;
+	elseif intUseAlgo == 3
+		imDetect = sFig.cellIm{1}(:,:,2);
+		imDetect = (imDetect + circshift(imDetect,[1 0]))/2;
+		imDetect = 1-imnorm(imDetect);
+	end
+	
+	%set sensitivity and threshold
+	dblMergeThreshold = 5;
+	dblSensitivity = 0.7;
+	dblEdgeThreshold = 0.05;
+	[matMergedCentroids,vecMergedRadii] = DC_ACD_GetDisks(imDetect,dblMergeThreshold,dblSensitivity,dblEdgeThreshold);
+	
+	%get masks and remove all centroids in masks
+	matMultiMask = any(cell2mat(reshape(arrayfun(@(x) logical(x.matMask),sDC.ROI,'UniformOutput',false),[1 1 numel(sDC.ROI)])),3);
+	matMultiMask = imdilate(matMultiMask,strel('disk',2));
+	
+	%loop
+	intNewCentroids = size(matMergedCentroids,1);
+	indKeep = false(1,intNewCentroids);
+	for intNewCentroid=1:intNewCentroids
+		%get this centroid's location
+		vecLoc=matMergedCentroids(intNewCentroid,:);
+		
+		if ~matMultiMask(round(vecLoc(2)),round(vecLoc(1)))
+			indKeep(intNewCentroid) = true;
+		end
+	end
+	matMergedCentroids(~indKeep,:) = [];
+	vecMergedRadii(~indKeep) = [];
+	
+	%get selected types
+	try
+		intType = get(sFig.ptrListCellType, 'Value');
+		intPresence = get(sFig.ptrListPresence, 'Value');
+		intRespType = get(sFig.ptrListRespType, 'Value');
+	catch
+		intType = 1;
+		intPresence = 1;
+		intRespType = 1;
+	end
+	
+	%add objects
+	intPrevROIs = numel(sDC.ROI);
+	for intObject=1:sum(indKeep)
+		% save roi
+		intNewObject = intObject+intPrevROIs;
+		sDC.ROI(intNewObject).intPresence = intPresence;
+		sDC.ROI(intNewObject).intRespType = intRespType;
+		sDC.ROI(intNewObject).intType = intType;
+		sDC.ROI(intNewObject).intCenterX = matMergedCentroids(intObject,1);
+		sDC.ROI(intNewObject).intCenterY = matMergedCentroids(intObject,2);
+		sDC.ROI(intNewObject).dblRadius = vecMergedRadii(intObject);
+		
+		sDC.ROI(intNewObject).matPerimeter = [];
+		sDC.ROI(intNewObject).matMask = [];
+		
+		sFig.sObject(intNewObject).drawn = 0;
+		sFig.sObject(intNewObject).handles.marker = [];
+		sFig.sObject(intNewObject).handles.lines = [];
+	end
+	
+	%set selection & update text
+	cellText = {sprintf('Detected %d objects',sum(indKeep))};
+	DC_updateTextInformation(cellText);
+	
+	%redraw
+	DC_redraw(0);
+	
+	%unlock GUI
+	DC_unlock(handles);
+end
+function ptrButtonRemoveOverlap_Callback(hObject, eventdata, handles) %#ok<DEFNU>
+	%globals
+	global sDC;
+	global sFig;
+	
+	%lock GUI
+	DC_lock(handles);
+	
+	%check if data has been loaded
+	if isempty(sDC) || isempty(sFig)
+		return;
+	else
+		try
+			%get current image
+			intImSelected = get(sFig.ptrListSelectImage,'Value');
+		catch %#ok<CTCH>
+			return;
+		end
+	end
+	
+	%lock GUI
+	DC_lock(handles);
+	
+	%loop through selected objects / or through all objects
+	for intObject = numel(sDC.ROI)
+		%get presence
+		intPresence = sDC.ROI(intObject).intPresence;
+		strPresence = sDC.metaData.cellPresence{intPresence};
+		
+		%skip if absent
+		if strcmp(strPresence,'absent')
+			continue;
+		end
+		
+		% set drawn flag
+		sFig.sObject(intObject).drawn = 0;
+		
+		%remove old drawing
+		if isfield(sFig.sObject(intObject).handles,'lines')
+			for p = 1:length(sFig.sObject(intObject).handles.lines)
+				delete(sFig.sObject(intObject).handles.lines(p));
+			end
+		else
+			p = [];
+		end
+		if isempty(p) && isfield(sDC.ROI(intObject),'intCenterX') && ~isempty(sDC.ROI(intObject).intCenterX)
+			delete(sFig.sObject(intObject).handles.marker);
+		end
+		if isfield(sFig.sObject(intObject).handles,'text') && ~isempty(sFig.sObject(intObject).handles.text)
+			delete(sFig.sObject(intObject).handles.text);
+			sFig.sObject(intObject).handles.text = [];
+		end
+	end
+	
+	%detect cells so all ROIs have masks
+	[intDetectObjects,indDelete] = DC_detectObjects;
+	
+	%remove overlap
+	[vecDeleteObjects,matCannotBeFixed] = DC_ACD_RefineBorders();
+	
+	%redraw
+	DC_redraw(1);
+	
+	%unlock GUI
+	DC_unlock(handles);
+end
 function ptrPanicButton_Callback(hObject, eventdata, handles) %#ok<DEFNU>
 	%unlock GUI
-	clc;
 	DC_unlock(handles);
 	
 	%set selection & update text
@@ -1640,3 +1992,4 @@ function ptrPanicButton_Callback(hObject, eventdata, handles) %#ok<DEFNU>
 	try I = imread('DC_KeepCalmAndRelax.tif');catch,return;end
 	h=figure;imshow(I)
 end
+

@@ -9,14 +9,8 @@ end
 
 %% define general metadata
 sPS = loadDefaultSettingsPrePro();%structProcessingSettings
-strMasterDir = 'D:\Data';
+strMasterDir = 'C:\Data';
 strTargetDir = '\Processed\imagingdata\';
-sPS.boolUseParallel = false;
-
-%% init parallel
-if sPS.boolUseParallel && matlabpool('size') == 0
-	matlabpool('open',4);
-end
 
 %% create filenames
 strMasterPath = [strMasterDir strTargetDir strSession filesep];
@@ -52,8 +46,3 @@ for intRec=vecRecordings
 	save(saveFileName,'sRec')
 end
 cd(strOldPath);
-
-%% close parallel workers if necessary
-if sPS.boolUseParallel && matlabpool('size') > 0
-	matlabpool('close');
-end

@@ -1,4 +1,4 @@
-function [saveFileName,sRec] = doImageToTimeseries(sRec,sDC,strMatRec)
+function [saveFileName,sRec] = doImageToTimeseries(sRec,sDC,strMatRec,strImPath)
 	%retrieves timeseries from image ROIs
 	
 	%define image variables
@@ -7,10 +7,12 @@ function [saveFileName,sRec] = doImageToTimeseries(sRec,sDC,strMatRec)
 	else
 		intCaCh = 1;
 	end
-	if isfield(sRec.sMD,'strMasterDir')
-		strImPath = [sRec.sMD.strMasterDir sRec.sMD.strImgTarget sRec.strSession filesep sRec.sProcLib.strRecording filesep];
-	else
-		strImPath = [sRec.sMD.strImgTarget sRec.strSession filesep sRec.sProcLib.strRecording filesep];
+	if ~exist('strImPath','var') || isempty(strImPath)
+		if isfield(sRec.sMD,'strMasterDir')
+			strImPath = [sRec.sMD.strMasterDir sRec.sMD.strImgTarget sRec.strSession filesep sRec.sProcLib.strRecording filesep];
+		else
+			strImPath = [sRec.sMD.strImgTarget sRec.strSession filesep sRec.sProcLib.strRecording filesep];
+		end
 	end
 	intLengthT = length(num2str(sRec.sProcLib.t-1));
 	strTargetIm = ['t%0' num2str(intLengthT) 'd_ch%02d.tif'];

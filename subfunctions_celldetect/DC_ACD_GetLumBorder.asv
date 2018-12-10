@@ -1,0 +1,8 @@
+function imDetectBorder = DC_ACD_GetLumBorder(im1D, intX, intY)
+	
+	figure
+	imshow(im1D);axis xy
+	hold on;scatter(intX,intY)
+	
+	BW2 = imfill(im1D,[intX intY])
+end

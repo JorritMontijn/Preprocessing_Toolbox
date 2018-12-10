@@ -5,7 +5,11 @@ function imOut = DC_ACD_maskCellSurround(imI, dblCenterX, dblCenterY, dblPixelSi
 	% get image size
 	[intMaxY, intMaxX] = size(imI);
 	intCenterY = round(dblCenterY);
+	if intCenterY < 5,intCenterY = 5;end
+	if intCenterY > (intMaxY-5),intCenterY = (intMaxY-5);end
 	intCenterX = round(dblCenterX);
+	if intCenterX < 5,intCenterX = 5;end
+	if intCenterX > (intMaxX-5),intCenterX = (intMaxX-5);end
 	
 	% get number of pixels of ROI-window radius
 	intRadiusReq = round((dblSizeROI/dblPixelSize) / 2);

@@ -9,14 +9,9 @@ end
 
 %% define general metadata
 sPS = loadDefaultSettingsPrePro();%structProcessingSettings
-strMasterDir = 'D:\Data';
+strMasterDir = 'C:\Data';
 strTargetDir = '\Processed\imagingdata\';
-sPS.boolUseParallel = false;
-
-%% init parallel
-if sPS.boolUseParallel && matlabpool('size') == 0
-	matlabpool('open',4);
-end
+strSourceMaster = 'D:\UvA_Backup\Data';
 
 %% create filenames
 for intRec=vecRecordings
@@ -39,7 +34,7 @@ for intRec=vecRecordings
 	%clear sRecLoad;
 	if ~isfield(sRec,'sDC')
 		sRec.sDC = sDC;
-		sRec.sMD.strMasterDir= 'D:\Data';
+		sRec.sMD.strMasterDir= 'C:\Data';
 		sRec.sMD.strImgSource= '\Raw\imagingdata\';
 		sRec.sMD.strLogSource= '\Raw\stimulationlogs\imaging\';
 		sRec.sMD.strImgTarget= '\Processed\imagingdata\';
@@ -48,11 +43,7 @@ for intRec=vecRecordings
 	end
 	
 	% run
-	[saveFileName,sRec] = doImageToTimeseries(sRec,sDC,strMatRec{intRec});
+	strImPath = [strSourceMaster sRec.sMD.strImgTarget sRec.strSession filesep sRec.sProcLib.strRecording filesep];
+	[saveFileName,sRec] = doImageToTimeseries(sRec,sDC,strMatRec{intRec},strImPath);
 end
 
-
-%% close parallel workers if necessary
-if sPS.boolUseParallel && matlabpool('size') > 0
-	matlabpool('close');
-end

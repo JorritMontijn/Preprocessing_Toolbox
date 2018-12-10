@@ -44,11 +44,16 @@
 clear all;
 
 %set recordings
-strSession = '20140715';
-vecRecordings = 1:5;
-
-runImageToTimeseries;
-
-runDetectCalciumTransients;
-
-runBuildSesFromPrePro;
+for i=1
+	clearvars -except i
+	if i == 1
+		strSession = '20140423';
+		vecRecordings = 1:2;
+	end
+	
+	runImageToTimeseries;
+	
+	runDetectCalciumTransients;
+	
+	runBuildSesFromPrePro;
+end

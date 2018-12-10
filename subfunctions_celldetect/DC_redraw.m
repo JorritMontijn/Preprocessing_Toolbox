@@ -117,17 +117,20 @@ function DC_redraw(varargin)
 			
 			%get type
 			intType = sDC.ROI(intObject).intType;
-			strType = sDC.metaData.cellType{intType};
 			
 			%assign color
 			vecColor = sDC.metaData.cellColor{intType};
-
+			
 			%if neuron
 			if ismember(intType,sDC.metaData.vecNeurons)
+				if ~isfield(sDC.ROI(intObject),'intPresence') || isempty(sDC.ROI(intObject).intPresence)
+					sDC.ROI(intObject).intPresence = 1;
+				end
+				
 				%get presence
 				intPresence = sDC.ROI(intObject).intPresence;
 				strPresence = sDC.metaData.cellPresence{intPresence};
-
+				
 				%change amount of blue
 				if strcmp(strPresence,'include')
 					vecColor(end) = 0;
@@ -140,39 +143,36 @@ function DC_redraw(varargin)
 			end
 			
 			% draw objects
-			%{
-			if isfield(sDC.ROI(intObject),'matPerimeter') && ~isempty(sDC.ROI(intObject).matPerimeter)
-				%draw outline
-				for p = 1:length(sDC.ROI(intObject).matPerimeter)-1
-					
-					sFig.sObject(intObject).handles.lines(p) = ...
-						line(sDC.ROI(intObject).matPerimeter(p:p+1, 1) * dblImageMagnification, ...
-						sDC.ROI(intObject).matPerimeter(p:p+1, 2) * dblImageMagnification, ...
-						'Color', vecColor, 'LineStyle', '-', 'LineWidth', intLineWidth );
-				end
-				sFig.sObject(intObject).handles.lines(p+1) = ...
-					line([sDC.ROI(intObject).matPerimeter(1,   1) ...
-					sDC.ROI(intObject).matPerimeter(end, 1) ] * dblImageMagnification, ...
-					[sDC.ROI(intObject).matPerimeter(1,   2) ...
-					sDC.ROI(intObject).matPerimeter(end, 2) ] * dblImageMagnification, ...
-					'Color',  vecColor, 'LineStyle', '-', 'LineWidth', intLineWidth );
-			%}
 			if isfield(sDC.ROI,'matMask') && ~isempty(sDC.ROI(intObject).matMask) && boolDrawBorder
-				sO = bwboundaries(sDC.ROI(intObject).matMask);
 				
-				%draw outline
-				for p = 1:length(sO{1})-1
-					sFig.sObject(intObject).handles.lines(p) = ...
-						line(sO{1}(p:p+1, 2) * dblImageMagnification, ...
-						sO{1}(p:p+1, 1) * dblImageMagnification, ...
-						'Color', vecColor, 'LineStyle', '-', 'LineWidth', intLineWidth );
+				cellPolygons = bwboundaries(sDC.ROI(intObject).matMask);
+				if numel(cellPolygons) > 1
+					%keep only biggest blob
+					[dummy,matLabels] = bwboundaries(sDC.ROI(intObject).matMask,'noholes');
+					vecSizes = sum(bsxfun(@eq,matLabels(:),unique(matLabels)'));
+					[dummy,intLargestObject]=max(vecSizes(2:end));
+					%assign new mask
+					sDC.ROI(intObject).matMask = matLabels==intLargestObject;
+					%assign new centroid
+					[vecYX] = calcCenterOfMass(sDC.ROI(intObject).matMask);
+					sDC.ROI(intObject).intCenterX = vecYX(2);
+					sDC.ROI(intObject).intCenterY = vecYX(1);
+					%get new polygons
+					cellPolygons = bwboundaries(sDC.ROI(intObject).matMask);
 				end
-				sFig.sObject(intObject).handles.lines(p+1) = ...
-					line([sO{1}(1,   2) ...
-					sO{1}(end, 2) ] * dblImageMagnification, ...
-					[sO{1}(1,   1) ...
-					sO{1}(end, 1) ] * dblImageMagnification, ...
-					'Color',  vecColor, 'LineStyle', '-', 'LineWidth', intLineWidth );
+				
+				matPoints = cellPolygons{1};
+				intPointsPerObject = 18;
+				intPoints = size(matPoints,1);
+				if intPoints > intPointsPerObject
+					vecReducedPoints = round(linspace(1,intPoints,intPointsPerObject));
+					matPoints = matPoints(vecReducedPoints,:);
+				end
+				%draw outline
+				sFig.sObject(intObject).handles.lines = ...
+					line(	matPoints(:, 2) * dblImageMagnification, ...
+					matPoints(:, 1) * dblImageMagnification, ...
+					'Color', vecColor, 'LineStyle', '-', 'LineWidth', intLineWidth );
 				
 			elseif isfield(sDC.ROI(intObject),'intCenterX') && ~isempty(sDC.ROI(intObject).intCenterX)
 				%draw center
