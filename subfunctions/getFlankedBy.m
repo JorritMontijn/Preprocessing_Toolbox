@@ -1,10 +1,15 @@
-function [strOut,intStop] = getFlankedBy(strInput,strBefore,strAfter)
+function [strOut,intStop] = getFlankedBy(strInput,strBefore,strAfter,strWhich)
 	%getFlankedBy Returns string flanked by two other strings
-	%Syntax: [strOut,intStop] = getFlankedBy(strInput,strBefore,strAfter)
+	%Syntax: [strOut,intStop] = getFlankedBy(strInput,strBefore,strAfter,strWhich)
 	%
 	%	Version history:
 	%	1.0 - August 6 2013
 	%	Created by Jorrit Montijn
+	
+	if ~exist('strWhich','var') || isempty(strWhich)
+		strWhich = 'first';
+	end
+	
 	intStop = -1;
 	strOut = '';
 	vecStart = strfind(strInput,strBefore);
@@ -12,7 +17,11 @@ function [strOut,intStop] = getFlankedBy(strInput,strBefore,strAfter)
 		if isempty(strBefore)
 			intStart = 1;
 		else
-			intStart = vecStart(1) + length(strBefore);
+			if strcmp(strWhich,'last')
+				intStart = vecStart(end) + length(strBefore);
+			elseif strcmpi(strWhich,'first')
+				intStart = vecStart(1) + length(strBefore);
+			end
 		end
 		findLast = strfind(strInput,strAfter);
 		if ~isempty(findLast) || isempty(strAfter)

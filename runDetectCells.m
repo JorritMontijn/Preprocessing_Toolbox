@@ -613,14 +613,13 @@ function ptrButtonLoadRecording_Callback(hObject, eventdata, handles) %#ok<DEFNU
 			DC_updateTextInformation(cellText);
 			
 			%build flood borders
-			dblMergeThreshold = 30;
 			imDetect = sFig.cellIm{1};
 			im1D = imDetect(:,:,2);
-			[matFloodBorders,matMergedCentroids,vecMergedRadii] = DC_ACD_GetFloodBorders(im1D,dblMergeThreshold);
+			matFloodBorders = DC_ACD_GetFloodBorders(im1D);
 			sRec.sPixResp.matFloodBorders = matFloodBorders;
 			
 			%set msg
-			cellText{1} = sprintf('Removing double-detected centroids...');
+			cellText{1} = sprintf('Adding flood borders...');
 			DC_updateTextInformation(cellText);
 			
 			%add image to list
@@ -628,60 +627,6 @@ function ptrButtonLoadRecording_Callback(hObject, eventdata, handles) %#ok<DEFNU
 			sDC.metaData.cellPixRespType{intExtraImCounter} = 'Flood Borders';
 			sRec.sPixResp.cellExtraIm{intExtraImCounter} = sRec.sPixResp.matFloodBorders;
 			set(sFig.ptrListSelectPixelResponsiveness,'String',sDC.metaData.cellPixRespType)
-			
-			%% remove double detected centroids
-			%get old centroids
-			intPrevROIs = numel(sDC.ROI);
-			matOldCentroids = nan(intPrevROIs,2);
-			for intROI=1:intPrevROIs
-				matOldCentroids(intROI,:) = [sDC.ROI(intROI).intCenterX sDC.ROI(intROI).intCenterY];
-			end
-			
-			%loop
-			dblDeleteThreshold = 30;
-			intNewCentroids = size(matMergedCentroids,1);
-			indKeep = false(1,intNewCentroids);
-			for intNewCentroid=1:intNewCentroids
-				%get this centroid's location
-				vecLoc=matMergedCentroids(intNewCentroid,:);
-				
-				%get distance to other centroids
-				vecDist = sqrt((vecLoc(1)-matOldCentroids(:,1)).^2 + (vecLoc(2)-matOldCentroids(:,2)).^2);
-				if ~any(vecDist<dblDeleteThreshold)
-					indKeep(intNewCentroid) = true;
-				end
-			end
-			matMergedCentroids(~indKeep,:) = [];
-			vecMergedRadii(~indKeep) = [];
-			
-			%get selected types
-			try
-				intType = get(sFig.ptrListCellType, 'Value');
-				intPresence = get(sFig.ptrListPresence, 'Value');
-				intRespType = get(sFig.ptrListRespType, 'Value');
-			catch
-				intType = 1;
-				intPresence = 1;
-				intRespType = 1;
-			end
-			%add objects
-			for intObject=1:sum(indKeep)
-				% save roi
-				intNewObject = intObject+intPrevROIs;
-				sDC.ROI(intNewObject).intPresence = intPresence;
-				sDC.ROI(intNewObject).intRespType = intRespType;
-				sDC.ROI(intNewObject).intType = intType;
-				sDC.ROI(intNewObject).intCenterX = matMergedCentroids(intObject,1);
-				sDC.ROI(intNewObject).intCenterY = matMergedCentroids(intObject,2);
-				sDC.ROI(intNewObject).dblRadius = vecMergedRadii(intObject);
-				
-				sDC.ROI(intNewObject).matPerimeter = [];
-				sDC.ROI(intNewObject).matMask = [];
-				
-				sFig.sObject(intNewObject).drawn = 0;
-				sFig.sObject(intNewObject).handles.marker = [];
-				sFig.sObject(intNewObject).handles.lines = [];
-			end
 		end
 		
 		%% end message
@@ -1284,7 +1229,7 @@ function ptrEditSubSelect_Callback(hObject, eventdata, handles) %#ok<DEFNU>
 		else
 			p = [];
 		end
-		if isempty(p) && isfield(sDC.ROI(intObject),'intCenterX') && ~isempty(sDC.ROI(intObject).intCenterX)
+		if isempty(p) && isfield(sDC.ROI(intObject),'intCenterX') && ~isempty(sDC.ROI(intObject).intCenterX) && isfield(sFig.sObject(intObject).handles,'marker')
 			delete(sFig.sObject(intObject).handles.marker);
 		end
 		if isfield(sFig.sObject(intObject).handles,'text') && ~isempty(sFig.sObject(intObject).handles.text)

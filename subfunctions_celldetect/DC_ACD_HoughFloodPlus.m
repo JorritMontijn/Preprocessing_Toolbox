@@ -1,6 +1,8 @@
 function matMask = DC_ACD_HoughFloodPlus(dblX, dblY, im1D)
 	%% get images
 	%global sFig;
+	dblX =  9.3726;
+	dblY = 39.5811;
 	global sRec;
 	if ~exist('im1D','var') || isempty(im1D)
 		im1D = sRec.sPixResp.matFloodBorders;
@@ -79,11 +81,10 @@ function matMask = DC_ACD_HoughFloodPlus(dblX, dblY, im1D)
 		vecMeanOfRho(isnan(vecMeanOfRho)) = 0;
 		vecMeanOfRho = conv(vecMeanOfRho,vecFilt,'same');
 		[dummy,vecRadiiRho] = findpeaks(vecMeanOfRho);
-		dblOctantRadius = vecRadiiRho(1);
-		if dblOctantRadius < dblMinRadius || dblOctantRadius > dblMaxRadius 
+		if isempty(vecRadiiRho) || vecRadiiRho(1) < dblMinRadius || vecRadiiRho(1) > dblMaxRadius
 			vecDodecantRadii(intRegion) = dblRadius-1;
 		else
-			vecDodecantRadii(intRegion) = dblOctantRadius;
+			vecDodecantRadii(intRegion) = vecRadiiRho(1);
 		end
 	end
 	

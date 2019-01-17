@@ -30,7 +30,9 @@ function [matFloodBorders,matMergedCentroids,vecMergedRadii] = DC_ACD_GetFloodBo
 	matFloodBorders = imnorm(matFloodBordersLow) + imnorm(matFloodBordersHigh);
 	
 	%% detect circles
-	[matMergedCentroids,vecMergedRadii] = DC_ACD_GetDisks(matFloodBorders,dblMergeThreshold);
+	if nargin > 1
+		[matMergedCentroids,vecMergedRadii] = DC_ACD_GetDisks(matFloodBorders,dblMergeThreshold);
+	end
 	
 	%plot
 	%figure,imshow(matFloodBorders);hold on;

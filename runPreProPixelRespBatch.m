@@ -38,7 +38,34 @@ for intSes=7:8
 	elseif intSes==8
 		strSession = '20140425';
 		vecRecordings = [9 10];
+		
+		%stim detect
+	elseif intSes == 11
+		strSes = '20140207';
+		vecBlock = 1:8; %define whether neurons are in same population or not
+	elseif intSes == 12
+		strSes = '20140314';
+		vecBlock = [1 1 1 1 1 1 1]; %define whether neurons are in same population or not
+	elseif intSes == 13
+		strSes = '20140425';
+		vecBlock = [1 1 1 1 1 1 1 1]; %define whether neurons are in same population or not
+	elseif intSes == 14
+		strSes = '20140507';
+		vecBlock = [1 1 1]; %define whether neurons are in same population or not
+	elseif intSes == 15
+		strSes = '20140530';
+		vecBlock = [1 1 1 1 1 1 1]; %define whether neurons are in same population or not
+	elseif intSes == 16
+		strSes = '20140604';
+		vecBlock = [1 1 1 1]; %define whether neurons are in same population or not
+	elseif intSes == 17
+		strSes = '20140711';
+		vecBlock = [1 1 1 2 2 2 2 2]; %define whether neurons are in same population or not
+	elseif intSes == 18
+		strSes = '20140715';
+		vecBlock = [1 1 1 1]; %define whether neurons are in same population or not
 	end
+	
 	
 	%get data
 	% define general metadata
