@@ -9,9 +9,9 @@ end
 
 %% define general metadata
 sPS = loadDefaultSettingsPrePro();%structProcessingSettings
-strMasterDir = 'C:\Data';
+strMasterDir = 'D:\Data';
 strTargetDir = '\Processed\imagingdata\';
-strSourceMaster = 'D:\UvA_Backup\Data';
+strSourceMaster = 'D:\Data';
 
 %% create filenames
 for intRec=vecRecordings

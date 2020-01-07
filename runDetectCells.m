@@ -422,7 +422,7 @@ function ptrButtonLoadRecording_Callback(hObject, eventdata, handles) %#ok<DEFNU
 	
 	%switch path
 	try
-		oldPath = cd('C:\Data\Processed\imagingdata\');
+		oldPath = cd('D:\Data\Processed\imagingdata\');
 	catch
 		oldPath = cd();
 	end
@@ -1795,29 +1795,53 @@ function ptrButtonDetectObjects_Callback(hObject, eventdata, handles) %#ok<DEFNU
 		imDetect = 1-imnorm(imDetect);
 	end
 	
+	%have new ROIs been detected?
+	boolNoneDetected = true;
+	dblSensStep = 0.02;
+	dblEdgeStep = 0.005;
+	
 	%set sensitivity and threshold
 	dblMergeThreshold = 5;
-	dblSensitivity = 0.7;
-	dblEdgeThreshold = 0.05;
-	[matMergedCentroids,vecMergedRadii] = DC_ACD_GetDisks(imDetect,dblMergeThreshold,dblSensitivity,dblEdgeThreshold);
+	dblSensitivity = 0.7-dblSensStep;
+	dblEdgeThreshold = 0.05+dblEdgeStep;
 	
-	%get masks and remove all centroids in masks
-	matMultiMask = any(cell2mat(reshape(arrayfun(@(x) logical(x.matMask),sDC.ROI,'UniformOutput',false),[1 1 numel(sDC.ROI)])),3);
-	matMultiMask = imdilate(matMultiMask,strel('disk',2));
-	
-	%loop
-	intNewCentroids = size(matMergedCentroids,1);
-	indKeep = false(1,intNewCentroids);
-	for intNewCentroid=1:intNewCentroids
-		%get this centroid's location
-		vecLoc=matMergedCentroids(intNewCentroid,:);
+	while boolNoneDetected
+		%set sensitivity and threshold
+		dblSensitivity = dblSensitivity + dblSensStep;
+		dblEdgeThreshold = dblEdgeThreshold-dblEdgeStep;
 		
-		if ~matMultiMask(round(vecLoc(2)),round(vecLoc(1)))
-			indKeep(intNewCentroid) = true;
+		%msg
+		cellText = {sprintf('Detecting new ROIs...'),...
+			sprintf('Sensitivity: %.3f',dblSensitivity),...
+			sprintf('Edge Threshold: %.4f',dblEdgeThreshold)};
+		DC_updateTextInformation(cellText);
+	
+		%detect
+		[matMergedCentroids,vecMergedRadii] = DC_ACD_GetDisks(imDetect,dblMergeThreshold,dblSensitivity,dblEdgeThreshold);
+		
+		%get masks and remove all centroids in masks
+		matMultiMask = any(cell2mat(reshape(arrayfun(@(x) logical(x.matMask),sDC.ROI,'UniformOutput',false),[1 1 numel(sDC.ROI)])),3);
+		matMultiMask = imdilate(matMultiMask,strel('disk',2));
+		
+		%loop
+		intNewCentroids = size(matMergedCentroids,1);
+		indKeep = false(1,intNewCentroids);
+		for intNewCentroid=1:intNewCentroids
+			%get this centroid's location
+			vecLoc=matMergedCentroids(intNewCentroid,:);
+			
+			if ~matMultiMask(round(vecLoc(2)),round(vecLoc(1)))
+				indKeep(intNewCentroid) = true;
+			end
+		end
+		matMergedCentroids(~indKeep,:) = [];
+		vecMergedRadii(~indKeep) = [];
+		
+		%check to end
+		if sum(indKeep) > 0
+			boolNoneDetected = false;
 		end
 	end
-	matMergedCentroids(~indKeep,:) = [];
-	vecMergedRadii(~indKeep) = [];
 	
 	%get selected types
 	try

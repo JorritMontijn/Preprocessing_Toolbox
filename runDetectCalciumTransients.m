@@ -9,7 +9,7 @@ end
 
 %% define general metadata
 sPS = loadDefaultSettingsPrePro();%structProcessingSettings
-strMasterDir = 'C:\Data';
+strMasterDir = 'D:\Data';
 strTargetDir = '\Processed\imagingdata\';
 
 %% create filenames
