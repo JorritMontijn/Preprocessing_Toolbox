@@ -5,17 +5,17 @@ function [matTranslationsX,matTranslationsY] = doInterpolateFromList(matDataPoin
 
 vecShiftsX = matDataPoints(:,3);
 vecShiftsX(getOutliers(vecShiftsX)) = 0;
-[dummy,dummy,matVx]=ind2mat(matDataPoints(:,1),matDataPoints(:,2),vecShiftsX);
+[dummy,dummy,matVx]=idx2mat(matDataPoints(:,1),matDataPoints(:,2),vecShiftsX);
 vecShiftsY = matDataPoints(:,4);
 vecShiftsY(getOutliers(vecShiftsY)) = 0;
-[dummy,dummy,matVy]=ind2mat(matDataPoints(:,1),matDataPoints(:,2),vecShiftsY);
+[dummy,dummy,matVy]=idx2mat(matDataPoints(:,1),matDataPoints(:,2),vecShiftsY);
 
 %extend matrices
-vecPointsX = getUniqueVals(matDataPoints(:,1));
-vecPointsY = getUniqueVals(matDataPoints(:,2));
+vecPointsX = unique(matDataPoints(:,1));
+vecPointsY = unique(matDataPoints(:,2));
 
-vecMeshX = [min(matXi(:)) vecPointsX max(matXi(:))];
-vecMeshY = [min(matYi(:)) vecPointsY max(matYi(:))];
+vecMeshX = [min(matXi(:));vecPointsX(:);max(matXi(:))]';
+vecMeshY = [min(matYi(:));vecPointsY(:);max(matYi(:))]';
 [matX,matY]= meshgrid(vecMeshX,vecMeshY);
 
 %extend matrixces

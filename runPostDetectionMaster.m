@@ -44,7 +44,7 @@
 clear all;
 
 %set recordings
-for i=5:8
+for i=8
 	clearvars -except i
 	if i == 1
 		strSession = '20130612';
@@ -76,7 +76,7 @@ for i=5:8
 	end
 	if i == 8
 		strSession = '20140425';
-		vecRecordings = 9:10;
+		vecRecordings = 10;
 	end
 	
 	runImageToTimeseries;
