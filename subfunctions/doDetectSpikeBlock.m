@@ -1,22 +1,27 @@
-function [apFrames, apSpikes, vecSpikes, expFit] = doDetectSpikeBlock(dFoF,dblSamplingFreq,dblTau,intBlockSize)
+function [vecSpikes, vecExpFit] = doDetectSpikeBlock(vec_dFoF,dblSamplingFreq,dblSpikeTau,intBlockSize, dblThresholdFactor)
 	%doDetectSpikeBlock Detects activation events in Ca2+ dF/F0 traces
-	%   [apFrames, apSpikes, vecSpikes, expFit] = doDetectSpikeBlock(dFoF,dblSamplingFreq,dblTau)
+	%   [vecFramesAP, vecNumberAP, vecSpikes, vecExpFit] = doDetectSpikeBlock(dFoF,dblSamplingFreq,dblSpikeTau,intBlockSize, dblThresholdFactor)
 	%
 	%	Version history:
 	%	3.0 - January 29 2016
 	%	Created by Jorrit Montijn
+	%	4.0 - April 7 2020
+	%	Added dynamic threshold
+	
+	%threshold factor
+	if ~exist('dblThresholdFactor','var') || isempty(dblThresholdFactor)
+		dblThresholdFactor = 1;
+	end
 	
 	%parameters & pre-allocate
 	if nargin < 4 || isempty(intBlockSize)
 		intBlockSize = 2500;
 	end
-	apFrames = [];
-	apSpikes = [];
-	vecSpikes = nan(size(dFoF));
-	expFit = nan(size(dFoF));
+	vecSpikes = nan(size(vec_dFoF));
+	vecExpFit = nan(size(vec_dFoF));
 	
 	%get number of blocks (split by [intBlockSize] frames)
-	intTotDur = length(dFoF);
+	intTotDur = length(vec_dFoF);
 	intBlocks = ceil(intTotDur/intBlockSize);
 	
 	
@@ -24,49 +29,56 @@ function [apFrames, apSpikes, vecSpikes, expFit] = doDetectSpikeBlock(dFoF,dblSa
 	for intBlock=1:intBlocks
 		%get data
 		vecFrames = ((intBlock-1)*intBlockSize+1):min([(intBlock*intBlockSize) intTotDur]);
-		vec_dFoF_block = dFoF(vecFrames);
+		vec_dFoF_block = vec_dFoF(vecFrames);
+		intLength = numel(vecFrames);
+		
+		%append end to dF/F if last block
+		if intBlock==intBlocks
+			intAddFrames = 100;
+			vec_dFoF_block((end+1):(end+intAddFrames)) = vec_dFoF_block(1:intAddFrames);
+		end
 		
 		%perform spike detection on block
 		
 		% dFoF-criteria based transient detection to get initial guess
-		[transients] = getTransientGuess(vec_dFoF_block, dblSamplingFreq, dblTau);
+		vecTransients = getTransientGuess(vec_dFoF_block, dblSamplingFreq, dblSpikeTau, dblThresholdFactor);
 		
 		% separate into blocks with connected transients
 		[sep_transients, sep_dFoF, sep_start, sep_stop] = ...
-			separate_transients( transients, vec_dFoF_block, dblSamplingFreq, dblTau );
+			separate_transients( vecTransients, vec_dFoF_block, dblSamplingFreq, dblSpikeTau );
 		
 		% loop for every block of transients to remove spikes with insufficient amplitude
-		sep_apFrames = cell(0); sep_apSpikes = cell(0); sep_expFit = cell(0);
+		sep_apFrames = cell(1,length(sep_transients)); 
+		sep_apSpikes = cell(1,length(sep_transients)); 
+		sep_expFit = cell(1,length(sep_transients));
 		for b = 1:length(sep_transients);
 			[sep_apFrames{b}, sep_apSpikes{b}, sep_expFit{b}] = ...
-				find_action_potentials_in_transients( sep_transients{b}, sep_dFoF{b}, dblSamplingFreq, dblTau );
+				find_action_potentials_in_transients( sep_transients{b}, sep_dFoF{b}, dblSamplingFreq, dblSpikeTau, dblThresholdFactor);
 		end
 		
 		% recombine into one trace and one list of AP's
-		[apFramesB, apSpikesB, vecSpikesB, expFitB] = doRecombineTransients(vec_dFoF_block, sep_apFrames, sep_apSpikes, sep_expFit, sep_start, sep_stop);
-		
+		[vecSpikesB, expFitB] = doRecombineTransients(vec_dFoF_block, sep_apFrames, sep_apSpikes, sep_expFit, sep_start, sep_stop);
 		
 		%assign to outpit
-		apFrames = [apFrames apFramesB]; %#ok<AGROW>
-		apSpikes = [apSpikes apSpikesB]; %#ok<AGROW>
-		vecSpikes(vecFrames) = vecSpikesB;
-		expFit(vecFrames) = expFitB;
+		vecSpikes(vecFrames) = vecSpikesB(1:intLength);
+		vecExpFit(vecFrames) = expFitB(1:intLength);
 	end
 end
 
 function [sep_transients, sep_dFoF, sep_start, sep_stop] = ...
-		separate_transients( transients, dFoF, samplingFreq, tau )
-	dt = 1/samplingFreq ;
+		separate_transients( vecTransients, vec_dFoF_block, dblSamplingFreq, dblSpikeTau )
+	%dt
+	dt = 1/dblSamplingFreq ;
 	
 	% number of transients
-	m = length(transients) ;
+	m = length(vecTransients) ;
 	intLength = 50;
 	
 	% put all transients in one array
-	ExpMat = zeros(m, length(dFoF)) ;
+	ExpMat = zeros(m, length(vec_dFoF_block)) ;
 	for j = 1:m
-		ExpMat( j, transients(j):transients(j)+intLength ) = ...
-			exp( (-(0:1:intLength) .* dt) ./ tau ) ;
+		ExpMat( j, vecTransients(j):vecTransients(j)+intLength ) = ...
+			exp( (-(0:1:intLength) .* dt) ./ dblSpikeTau ) ;
 	end
 	transarray = sum(ExpMat);
 	
@@ -98,10 +110,10 @@ function [sep_transients, sep_dFoF, sep_start, sep_stop] = ...
 				end
 				
 				% cut out trace of dFoF
-				sep_dFoF{blnr} = dFoF(blstart:blstop);
+				sep_dFoF{blnr} = vec_dFoF_block(blstart:blstop);
 				
 				% find transients that go in trace
-				trns = transients(transients >= blstart & transients < blstop);
+				trns = vecTransients(vecTransients >= blstart & vecTransients < blstop);
 				
 				% correct for changed starting frame
 				trns = trns - (blstart-1);
@@ -132,24 +144,24 @@ function [sep_transients, sep_dFoF, sep_start, sep_stop] = ...
 end
 
 function [apFrames, apSpikes, expFit] = ...
-		find_action_potentials_in_transients( transients, dFoF, samplingFreq, tau )
+		find_action_potentials_in_transients( vecSepTransients, vecSep_dFoF, dblSamplingFreq, dblSpikeTau, dblThresholdFactor)
 	
 	intLength = 50;
 	
-	if size(dFoF,1) == 1
-		dFoF = dFoF';
+	if size(vecSep_dFoF,1) == 1
+		vecSep_dFoF = vecSep_dFoF';
 	end
-	dt = 1/samplingFreq ;
+	dt = 1/dblSamplingFreq ;
 	
 	% number of transients
-	m = length(transients) ;
+	m = length(vecSepTransients) ;
 	
 	% matrix with one row per transient and one exponential on each row,
 	% starting at the location of the transient
-	ExpMat = zeros(m, length(dFoF)) ;
+	ExpMat = zeros(m, length(vecSep_dFoF)) ;
 	for j = 1:m
-		ExpMat( j, transients(j):transients(j)+intLength ) = ...
-			exp( (-(0:1:intLength) .* dt) ./ tau ) ;
+		ExpMat( j, vecSepTransients(j):vecSepTransients(j)+intLength ) = ...
+			exp( (-(0:1:intLength) .* dt) ./ dblSpikeTau ) ;
 	end
 	
 	% find weight of transient at each row that gives best fit to the dFoF
@@ -158,7 +170,7 @@ function [apFrames, apSpikes, expFit] = ...
 		
 		% fit transients with matrix of exponentials
 		%         h = lsqr(ExpMat', dFoF, 0.001, 50);
-		h = ExpMat'\dFoF;
+		h = ExpMat'\vecSep_dFoF;
 		
 		% find exponential with the smallest height
 		minh = find( h == min(h) );
@@ -167,10 +179,10 @@ function [apFrames, apSpikes, expFit] = ...
 		end
 		
 		% check if minh < 0.1
-		if h(minh) < 0.1
+		if h(minh) < (0.1*dblThresholdFactor)
 			% remove transient and continue loop
 			ExpMat(minh,:) = [];
-			transients(minh) = [];
+			vecSepTransients(minh) = [];
 		else
 			% no transients are smaller that 0.1, so we're done
 			trBelow01 = 0;
@@ -179,8 +191,8 @@ function [apFrames, apSpikes, expFit] = ...
 	end
 	
 	% set output variables
-	apFrames = transients;
-	apSpikes = round((h*100)/9.75);
+	apFrames = vecSepTransients;
+	apSpikes = round((h*100)/5);
 	expFit = ExpMat'*h;
 	
 end

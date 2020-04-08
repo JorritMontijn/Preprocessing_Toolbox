@@ -46,7 +46,7 @@ function [vecdFoF,vecF,vecF0] = calcdFoF(vecF, dblSamplingFreq,intType,dblFracti
 		vecKernel = vecKernel / sum(vecKernel); %set integral to 1
 		
 		% smooth F
-		vecF = conv(vecF,vecKernel,'same');
+		vecF = imfilt(vecF(:)',vecKernel);
 		
 		% calculate F0 window size
 		dblWindowSecs = min( [ (0.4 * (length(vecF)/dblSamplingFreq)) dblSecWindowSize] ); %number of seconds for F0 baselining
