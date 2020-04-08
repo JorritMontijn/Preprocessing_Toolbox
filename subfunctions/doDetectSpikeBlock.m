@@ -192,7 +192,7 @@ function [apFrames, apSpikes, expFit] = ...
 	
 	% set output variables
 	apFrames = vecSepTransients;
-	apSpikes = round((h*100)/5);
+	apSpikes = round(((h*100)/10)/dblThresholdFactor);
 	expFit = ExpMat'*h;
 	
 end
