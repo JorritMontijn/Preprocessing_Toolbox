@@ -13,7 +13,7 @@ function [vecFramesAP, vecNumberAP, vecSpikes, vecExpFit, vecSpikeTimes] = doDet
 		dblThresholdFactor = 1;
 	end
 	
-	if ~exist('dblThresholdFactor','var') || isempty(intBlockSize)
+	if ~exist('intBlockSize','var') || isempty(intBlockSize)
 		vecPrimes = primes(5000);
 		intBlockSize = vecPrimes(end);
 	elseif intBlockSize < 1 || round(intBlockSize) ~= intBlockSize
