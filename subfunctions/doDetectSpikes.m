@@ -14,27 +14,30 @@ function [vecFramesAP, vecNumberAP, vecSpikes, vecExpFit, vecSpikeTimes] = doDet
 	end
 	
 	if ~exist('intBlockSize','var') || isempty(intBlockSize)
-		vecPrimes = primes(5000);
+		vecPrimes = primes(1000);
 		intBlockSize = vecPrimes(end);
 	elseif intBlockSize < 1 || round(intBlockSize) ~= intBlockSize
 		error([mfilename 'E:SyntaxError'],'Syntax error; block size is incorrect');
 	end
+	if size(vec_dFoF,2) == 1
+		vec_dFoF = vec_dFoF';
+	end
 	
 	%separate into blocks to avoid block edge intersections
 	intOffset1 = 1;
-	vecPrimes1000 = primes(1000);
-	intOffset2 = vecPrimes1000(end);
-	vecPrimes2000 = primes(2000);
-	intOffset3 = vecPrimes2000(end);
+	vecPrimes100 = primes(100);
+	intOffset2 = vecPrimes100(end);
+	vecPrimes200 = primes(200);
+	intOffset3 = vecPrimes200(end);
 	
 	%get blocks with AE detections
-	[vecSpikes1, vecExpFit1] = doDetectSpikeBlock(vec_dFoF(intOffset1:end),dblSamplingFreq,dblSpikeTau,intBlockSize,dblThresholdFactor);
+	[vecSpikes1, vecExpFit1] = doDetectSpikeBlockFused(vec_dFoF(intOffset1:end),dblSamplingFreq,dblSpikeTau,intBlockSize,dblThresholdFactor);
 	
-	[vecSpikes2, vecExpFit2] = doDetectSpikeBlock(vec_dFoF(intOffset2:end),dblSamplingFreq,dblSpikeTau,intBlockSize,dblThresholdFactor);
+	[vecSpikes2, vecExpFit2] = doDetectSpikeBlockFused(vec_dFoF(intOffset2:end),dblSamplingFreq,dblSpikeTau,intBlockSize,dblThresholdFactor);
 	vecSpikes2 = [zeros(1,intOffset2-1) vecSpikes2];
 	vecExpFit2 = [zeros(1,intOffset2-1) vecExpFit2];
 	
-	[vecSpikes3, vecExpFit3] = doDetectSpikeBlock(vec_dFoF(intOffset3:end),dblSamplingFreq,dblSpikeTau,intBlockSize,dblThresholdFactor);
+	[vecSpikes3, vecExpFit3] = doDetectSpikeBlockFused(vec_dFoF(intOffset3:end),dblSamplingFreq,dblSpikeTau,intBlockSize,dblThresholdFactor);
 	vecSpikes3 = [zeros(1,intOffset3-1) vecSpikes3];
 	vecExpFit3 = [zeros(1,intOffset3-1) vecExpFit3];
 	

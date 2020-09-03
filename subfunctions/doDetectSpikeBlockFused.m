@@ -1,4 +1,4 @@
-function [vecSpikes, vecExpFit] = doDetectSpikeBlock(vec_dFoF,dblSamplingFreq,dblSpikeTau,intBlockSize, dblThresholdFactor)
+function [vecSpikes, vecExpFit] = doDetectSpikeBlockFused(vec_dFoF,dblSamplingFreq,dblSpikeTau,intBlockSize, dblThresholdFactor)
 	%doDetectSpikeBlock Detects activation events in Ca2+ dF/F0 traces
 	%   [vecFramesAP, vecNumberAP, vecSpikes, vecExpFit] = doDetectSpikeBlock(dFoF,dblSamplingFreq,dblSpikeTau,intBlockSize, dblThresholdFactor)
 	%
@@ -7,6 +7,8 @@ function [vecSpikes, vecExpFit] = doDetectSpikeBlock(vec_dFoF,dblSamplingFreq,db
 	%	Created by Jorrit Montijn
 	%	4.0 - April 7 2020
 	%	Added dynamic threshold
+	%	4.1 - September 1 2020
+	%	Reduced computation time and fixed some bugs
 	
 	%threshold factor
 	if ~exist('dblThresholdFactor','var') || isempty(dblThresholdFactor)
@@ -15,7 +17,7 @@ function [vecSpikes, vecExpFit] = doDetectSpikeBlock(vec_dFoF,dblSamplingFreq,db
 	
 	%parameters & pre-allocate
 	if nargin < 4 || isempty(intBlockSize)
-		intBlockSize = 2500;
+		intBlockSize = 997;
 	end
 	vecSpikes = nan(size(vec_dFoF));
 	vecExpFit = nan(size(vec_dFoF));
@@ -27,7 +29,6 @@ function [vecSpikes, vecExpFit] = doDetectSpikeBlock(vec_dFoF,dblSamplingFreq,db
 	
 	%split into blocks
 	for intBlock=1:intBlocks
-		intBlock
 		%get data
 		vecFrames = ((intBlock-1)*intBlockSize+1):min([(intBlock*intBlockSize) intTotDur]);
 		vec_dFoF_block = vec_dFoF(vecFrames);
@@ -35,7 +36,7 @@ function [vecSpikes, vecExpFit] = doDetectSpikeBlock(vec_dFoF,dblSamplingFreq,db
 		
 		%append end to dF/F if last block
 		if intBlock==intBlocks
-			intAddFrames = 100;
+			intAddFrames = min([100,numel(vec_dFoF_block)]);
 			vec_dFoF_block((end+1):(end+intAddFrames)) = vec_dFoF_block(1:intAddFrames);
 		end
 		
