@@ -10,9 +10,11 @@ function [vecFramesAP, vecNumberAP, vecSpikes, vecExpFit, vecSpikeTimes] = doDet
 	
 	%parameters & pre-allocate
 	if ~exist('dblThresholdFactor','var') || isempty(dblThresholdFactor)
-		dblThresholdFactor = 1;
+		dblThresholdFactor = 0.25;
 	end
-	
+	if ~exist('dblSpikeTau','var') || isempty(dblSpikeTau)
+		dblSpikeTau = 0.7;
+	end
 	if ~exist('intBlockSize','var') || isempty(intBlockSize)
 		vecPrimes = primes(1000);
 		intBlockSize = vecPrimes(end);
