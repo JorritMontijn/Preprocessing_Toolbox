@@ -89,12 +89,16 @@ function [ses,indKeepList] = doRecalcdFoF(ses,intSwitch,indKeepList,strType,dblF
 		end
 	elseif intSwitch == 8 %post-dF/F neuropil subtraction
 		dblSamplingFreq = ses.samplingFreq;
-		for intNeuron=1:numel(ses.(strType));
-			fprintf('Recalculating dF/F0 for neuron %d/%d [%s]\n',intNeuron,numel(ses.(strType)),getTime);
+		sN = ses.(strType);
+		cellF = {sN.F};
+		cellnpF = {sN.npF};
+		celldFoF = {sN.dFoF};
+		parfor intNeuron=1:numel(cellF)
+			fprintf('Recalculating dF/F0 for neuron %d/%d [%s]\n',intNeuron,numel(sN),getTime);
 			
 			%get F
-			vecSoma = calcdFoF(ses.(strType)(intNeuron).F,dblSamplingFreq,[],dblFraction,dblSecWindowSize);
-			vecNeuropil = calcdFoF(ses.(strType)(intNeuron).npF,dblSamplingFreq,[],dblFraction,dblSecWindowSize);
+			vecSoma = calcdFoF(cellF{intNeuron},dblSamplingFreq,[],dblFraction,dblSecWindowSize);
+			vecNeuropil = calcdFoF(cellnpF{intNeuron},dblSamplingFreq,[],dblFraction,dblSecWindowSize);
 			
 			%get F
 			if isempty(dblNeuropilSubtractionFactor)
@@ -104,7 +108,11 @@ function [ses,indKeepList] = doRecalcdFoF(ses,intSwitch,indKeepList,strType,dblF
 			end
 			
 			% calculate dFoF
-			ses.(strType)(intNeuron).dFoF = vecSoma - dblFactor*vecNeuropil;
+			celldFoF{intNeuron} = vecSoma - dblFactor*vecNeuropil;
+		end
+		%assign
+		for intNeuron=1:numel(cellF)
+			ses.(strType)(intNeuron).dFoF = celldFoF{intNeuron};
 		end
 	end
 end
