@@ -18,7 +18,7 @@ function [vecdFoF,vecF,vecF0] = calcdFoF(vecF, dblSamplingFreq,intType,dblFracti
 	
 	%perform calculation
 	if intType==1 
-		%% old version by pieter [but slightly updated by jorrit]
+		%% loop
 		% smooth and baseline the data
 		dblWindowSecs = min( [ (0.4 * (length(vecF)/dblSamplingFreq)) dblSecWindowSize] ); %number of seconds for F0 baselining
 		intWindowFrames = round(dblSamplingFreq*dblWindowSecs) ; %number of frames for F0 baselining
@@ -26,10 +26,8 @@ function [vecdFoF,vecF,vecF0] = calcdFoF(vecF, dblSamplingFreq,intType,dblFracti
 		vecF = smooth1D(vecF', 3, 'gaussian') ;
 		vecF0 = zeros(size(vecF)) ;
 		% calculate F0 (baseline) per frame
-		for i=1:intWindowFrames
-			sortF = sort( vecF( i:i+intWindowFrames ) ) ;
-			vecF0(i) = mean( sortF(1:round(intWindowFrames/2)) ) ;
-		end
+		sortF = sort( vecF( 1:intWindowFrames ) ) ;
+		vecF0(1:intWindowFrames) = mean( sortF(1:round(intWindowFrames/2)) ) ;
 		for i=(intWindowFrames+1):length(vecF)
 			sortF = sort( vecF( i-intWindowFrames:i ) ) ;
 			vecF0(i) = mean( sortF(1:round(intWindowFrames/2)) ) ;
